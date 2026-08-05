@@ -62,9 +62,12 @@ export class ToolAPI {
 
    
   /**
-   * Submit user answers.
+   * Submit a reply on a UserInputManager oneshot channel.
+   *
+   * Used by AskUserQuestion (answer map) and by FE↔Rust bridges that reuse the
+   * same channel (for example foreshadow_get_context snapshot responses).
    */
-  async submitUserAnswers(toolId: string, answers: Record<string, string | string[]>): Promise<void> {
+  async submitUserAnswers(toolId: string, answers: unknown): Promise<void> {
     try {
       await api.invoke('submit_user_answers', { 
         toolId,

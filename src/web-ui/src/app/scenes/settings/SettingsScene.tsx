@@ -23,6 +23,7 @@ import {
   BasicsConfig,
   EditorConfig,
   ExternalSourcesConfig,
+  ForeshadowConfig,
   HooksConfig,
   KeyboardShortcutsTab,
   McpToolsConfig,
@@ -63,6 +64,7 @@ function resolveSettingsContent(tab: ConfigTab): React.ComponentType | null {
     case 'voice-input':             return VoiceInputConfig;
     case 'review':                  return ReviewConfig;
     case 'memories':                return MemoriesConfig;
+    case 'foreshadow':              return ForeshadowConfig;
     case 'mcp-tools':               return McpToolsConfig;
     case 'external-sources':        return ExternalSourcesConfig;
     case 'hooks':                   return HooksConfig;

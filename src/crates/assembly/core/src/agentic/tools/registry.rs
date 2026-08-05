@@ -549,6 +549,7 @@ mod tests {
             "ControlHub",
             "ComputerUse",
             "Playbook",
+            "foreshadow_get_context",
         ];
 
         assert_eq!(
@@ -728,6 +729,7 @@ mod tests {
                 "ControlHub",
                 "ComputerUse",
                 "Playbook",
+                "foreshadow_get_context",
             ],
             "deferred tool manifest must stay stable before moving registry or manifest ownership"
         );
@@ -771,6 +773,7 @@ mod tests {
                 "GetMCPPrompt",
                 "GenerativeUI",
                 "Playbook",
+                "foreshadow_get_context",
             ],
             "readonly tool manifest must stay stable before moving registry ownership"
         );

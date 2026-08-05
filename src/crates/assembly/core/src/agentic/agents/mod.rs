@@ -132,6 +132,7 @@ pub fn shared_coding_mode_tools() -> Vec<String> {
         "InitMiniApp".to_string(),
         "PageDeploy".to_string(),
         "PagePublish".to_string(),
+        "foreshadow_get_context".to_string(),
     ];
     append_provider_group_tools(&mut tools, "core.canvas");
     tools
@@ -301,6 +302,16 @@ mod tests {
         let tools = shared_coding_mode_tools();
 
         assert!(tools.contains(&"ReviewPlatform".to_string()));
+    }
+
+    #[test]
+    fn shared_coding_mode_tools_include_foreshadow_get_context() {
+        let tools = shared_coding_mode_tools();
+
+        assert!(
+            tools.contains(&"foreshadow_get_context".to_string()),
+            "Foreshadow context tool must be on the shared coding allow-list so GetToolSpec can resolve it"
+        );
     }
 
     #[test]

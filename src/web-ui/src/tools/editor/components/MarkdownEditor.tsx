@@ -15,6 +15,7 @@ import { sendDebugProbe } from '@/shared/utils/debugProbe';
 import { elapsedMs, nowMs } from '@/shared/utils/timing';
 import { globalEventBus } from '@/infrastructure/event-bus';
 import { isSamePath } from '@/shared/utils/pathUtils';
+import { foreshadowCaptureBridge } from '@/tools/foreshadow/capture';
 import {
   isPeerDeviceModeActive,
   PEER_MODE_FILE_SYNC_POLL_MS,
@@ -559,7 +560,12 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   const handleContentChange = useCallback((newContent: string) => {
     contentRef.current = newContent;
     setContent(newContent);
-  }, []);
+    // TipTap / MEditor path: after-only textChanged for Foreshadow (P4).
+    // Unsafe source mode uses CodeEditor and is covered by Monaco capture (P2).
+    if (filePath) {
+      foreshadowCaptureBridge.notifyMarkdownTextChanged(filePath, newContent);
+    }
+  }, [filePath]);
 
   const handleDirtyChange = useCallback((isDirty: boolean) => {
     setHasChanges(isDirty);

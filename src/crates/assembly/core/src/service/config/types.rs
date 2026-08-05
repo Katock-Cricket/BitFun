@@ -62,6 +62,9 @@ pub struct GlobalConfig {
     pub tool_permissions: ToolPermissionConfig,
     #[serde(default)]
     pub memories: MemoriesConfig,
+    /// Foreshadow activity-context host settings (default disabled).
+    #[serde(default)]
+    pub foreshadow: ForeshadowConfig,
     /// Project-scoped overlays stored in the shared config document.
     #[serde(default, skip_serializing_if = "ProjectConfig::is_empty")]
     pub project: ProjectConfig,
@@ -878,6 +881,21 @@ pub struct MemoriesConfig {
     pub consolidation_model: Option<String>,
 }
 
+/// Foreshadow activity-context host settings.
+///
+/// Capture stays off until the user explicitly enables authorization.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct ForeshadowConfig {
+    /// Master enable / user authorization for local workspace capture.
+    pub enabled: bool,
+    /// Whether TaskRecognizer may call LLM periodically.
+    pub task_recognize: bool,
+    /// Model selector for TaskRecognizer (`fast` / `primary` / model id).
+    /// `None` follows BitFun default (fast → primary).
+    pub task_model: Option<String>,
+}
+
 impl AIConfig {
     /// Resolves a canonical configured model ID.
     ///
@@ -1653,6 +1671,7 @@ impl Default for GlobalConfig {
             workspace: WorkspaceConfig::default(),
             ai: AIConfig::default(),
             memories: MemoriesConfig::default(),
+            foreshadow: ForeshadowConfig::default(),
             project: ProjectConfig::default(),
             tool_permissions: ToolPermissionConfig::default(),
             mcp_servers: None,
@@ -1878,6 +1897,16 @@ impl Default for MemoriesConfig {
             phase2_retry_delay_seconds: default_memory_phase2_retry_delay_seconds(),
             extract_model: None,
             consolidation_model: None,
+        }
+    }
+}
+
+impl Default for ForeshadowConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            task_recognize: true,
+            task_model: None,
         }
     }
 }
@@ -2664,6 +2693,9 @@ mod tests {
         assert_eq!(config.memories.phase2_retry_delay_seconds, 60 * 60);
         assert_eq!(config.memories.extract_model, None);
         assert_eq!(config.memories.consolidation_model, None);
+        assert!(!config.foreshadow.enabled);
+        assert!(config.foreshadow.task_recognize);
+        assert_eq!(config.foreshadow.task_model, None);
     }
 
     #[test]

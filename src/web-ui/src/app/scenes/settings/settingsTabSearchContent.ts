@@ -131,6 +131,18 @@ export const SETTINGS_TAB_SEARCH_CONTENT: Record<ConfigTab, readonly SettingsTab
     { ns: 'settings/memories', key: 'fields.phase1MaxConcurrency.label' },
   ],
 
+  foreshadow: [
+    { ns: 'settings/foreshadow', key: 'title' },
+    { ns: 'settings/foreshadow', key: 'subtitle' },
+    { ns: 'settings/foreshadow', key: 'sections.capture.title' },
+    { ns: 'settings/foreshadow', key: 'sections.capture.description' },
+    { ns: 'settings/foreshadow', key: 'sections.task.title' },
+    { ns: 'settings/foreshadow', key: 'fields.enabled.label' },
+    { ns: 'settings/foreshadow', key: 'fields.taskRecognize.label' },
+    { ns: 'settings/foreshadow', key: 'fields.taskModel.label' },
+    { ns: 'settings/foreshadow', key: 'fields.mcpTool.label' },
+  ],
+
   'mcp-tools': [
     { ns: 'settings/mcp-tools', key: 'title' },
     { ns: 'settings/mcp-tools', key: 'subtitle' },

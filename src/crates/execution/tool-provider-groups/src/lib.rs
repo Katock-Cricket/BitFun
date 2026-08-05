@@ -186,6 +186,7 @@ const PRODUCT_TOOL_PROVIDER_GROUP_PLAN: &[ToolProviderGroupPlan] = &[
             "ControlHub",
             "ComputerUse",
             "Playbook",
+            "foreshadow_get_context",
         ],
     },
 ];
@@ -403,6 +404,7 @@ mod tests {
                 "ControlHub",
                 "ComputerUse",
                 "Playbook",
+                "foreshadow_get_context",
             ]
         );
     }

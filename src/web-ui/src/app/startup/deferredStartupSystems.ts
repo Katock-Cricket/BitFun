@@ -25,6 +25,7 @@ export interface DeferredStartupSystemsDependencies {
   initializeIdeControl?: () => Promise<void>;
   initializeMcpServers?: () => Promise<void>;
   initializeAcpClients?: () => Promise<void>;
+  initializeForeshadow?: () => Promise<void>;
   preloadDeferredRenderers?: () => Promise<void>;
 }
 
@@ -58,6 +59,11 @@ async function preloadDeferredRenderersDefault(): Promise<void> {
   ]);
 }
 
+async function initializeForeshadowDefault(): Promise<void> {
+  const { initializeForeshadowRuntimeMap } = await import('@/tools/foreshadow');
+  await initializeForeshadowRuntimeMap();
+}
+
 export function scheduleDeferredStartupSystems(
   dependencies: DeferredStartupSystemsDependencies = {}
 ): BackgroundTaskHandle<void> {
@@ -67,6 +73,7 @@ export function scheduleDeferredStartupSystems(
   const initializeIdeControl = dependencies.initializeIdeControl ?? initializeIdeControlDefault;
   const initializeMcpServers = dependencies.initializeMcpServers ?? initializeMcpServersDefault;
   const initializeAcpClients = dependencies.initializeAcpClients ?? initializeAcpClientsDefault;
+  const initializeForeshadow = dependencies.initializeForeshadow ?? initializeForeshadowDefault;
   const preloadDeferredRenderers = dependencies.preloadDeferredRenderers ?? preloadDeferredRenderersDefault;
 
   return scheduler.schedule(async signal => {
@@ -91,6 +98,7 @@ export function scheduleDeferredStartupSystems(
     await runStep('ide_control', initializeIdeControl);
     await runStep('mcp_servers', initializeMcpServers);
     await runStep('acp_clients', initializeAcpClients);
+    await runStep('foreshadow', initializeForeshadow);
     await runStep('renderer_preloads', preloadDeferredRenderers);
 
     if (!signal.aborted) {

@@ -1,0 +1,69 @@
+{
+  "title": "Foreshadow",
+  "subtitle": "Authorize local workspace activity capture for agent context (editor, terminal, markdown).",
+  "sections": {
+    "capture": {
+      "title": "Capture",
+      "description": "Foreshadow only runs on local workspaces after you enable it. Remote and peer workspaces are unsupported."
+    },
+    "task": {
+      "title": "Task recognition",
+      "description": "Optional LLM-assisted task recognition over captured activity. Uses the BitFun model chain (fast → primary by default)."
+    }
+  },
+  "fields": {
+    "enabled": {
+      "label": "Enable Foreshadow capture",
+      "description": "Authorize collecting local editor, terminal, and markdown activity into workspace context. Off by default."
+    },
+    "remoteNotice": {
+      "label": "Remote workspace",
+      "description": "Foreshadow is unavailable for remote or peer workspaces. Open a local workspace to enable capture."
+    },
+    "status": {
+      "label": "Runtime status"
+    },
+    "dataDir": {
+      "label": "Data directory",
+      "noWorkspace": "No active workspace. Data will be stored under {workspace}/.foreshadow/ when capture is ready."
+    },
+    "mcpTool": {
+      "label": "Agent tool",
+      "description": "Agents will read context via this tool name once the MCP path is wired (P6)."
+    },
+    "taskRecognize": {
+      "label": "Recognize tasks with LLM",
+      "description": "Allow TaskRecognizer to call a model periodically. Disable to keep capture-only mode."
+    },
+    "taskModel": {
+      "label": "Task recognition model",
+      "description": "Model used for task recognition. Empty follows BitFun default (fast → primary)."
+    }
+  },
+  "models": {
+    "primary": "Primary model",
+    "fast": "Fast model",
+    "followDefault": "Follow default (fast → primary)"
+  },
+  "status": {
+    "ready": "Capture runtime is ready for the active local workspace.",
+    "noWorkspace": "No active workspace.",
+    "remoteUnsupported": "Unavailable for remote or peer workspaces.",
+    "notAuthorized": "Capture is disabled. Enable Foreshadow above.",
+    "notReady": "Runtime is not ready yet.",
+    "internalError": "Runtime error. Check logs for details.",
+    "badgeReady": "Ready",
+    "badgeUnavailable": "Unavailable"
+  },
+  "actions": {
+    "resetSettings": "Reset Foreshadow Settings"
+  },
+  "messages": {
+    "loading": "Loading Foreshadow settings…",
+    "loadFailed": "Failed to load Foreshadow settings",
+    "saved": "Foreshadow settings saved",
+    "saveFailed": "Failed to save Foreshadow settings",
+    "settingsReset": "Foreshadow settings reset",
+    "settingsResetFailed": "Failed to reset Foreshadow settings"
+  }
+}

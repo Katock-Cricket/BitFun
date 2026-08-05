@@ -1,10 +1,28 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { createRequire } from "node:module";
 import { versionInjectionPlugin } from "./vite.config.version-plugin";
 import { bitfunCanvasRuntimeBundlePlugin } from "./vite.config.canvas-runtime-plugin";
 
 const host = process.env.TAURI_DEV_HOST;
+const requireFromWebUi = createRequire(path.join(__dirname, "package.json"));
+
+/**
+ * Resolve @foreshadow/core from the installed npm package.
+ * Prefer registry installs (`^x.y.z`); do not hardcode machine-local sibling paths.
+ */
+function resolveForeshadowFsAllow(): string[] {
+  try {
+    const entry = requireFromWebUi.resolve("@foreshadow/core");
+    const pkgDir = path.dirname(entry);
+    // Published package keeps sources under <pkg>/src (see packages/core layout).
+    const packagedSrc = path.join(pkgDir, "src");
+    return [pkgDir, packagedSrc];
+  } catch {
+    return [];
+  }
+}
 
 /**
  * Native fs events do not work reliably on UNC network shares (\\server\...,
@@ -54,6 +72,10 @@ export default defineConfig(({ mode, command }) => {
         "@/types": path.resolve(__dirname, "./src/shared/types"),
         "@/utils": path.resolve(__dirname, "./src/shared/utils"),
         "@components": path.resolve(__dirname, "./src/component-library/components"),
+        // @foreshadow/core still imports Node builtins (os/path). BitFun Host runs
+        // that package in the browser/webview, so map them to thin shims.
+        os: path.resolve(__dirname, "./src/tools/foreshadow/shims/node-os.ts"),
+        path: path.resolve(__dirname, "./src/tools/foreshadow/shims/node-path.ts"),
       },
     },
 
@@ -83,10 +105,12 @@ export default defineConfig(({ mode, command }) => {
       host: host || "localhost",
       port: 1421,
     },
-    // Allow access to workspace root for dependencies like monaco-editor
+    // Allow access to workspace root for dependencies like monaco-editor,
+    // and the installed @foreshadow/core package under node_modules.
     fs: {
       allow: [
         path.resolve(__dirname, '../../'), // Workspace root
+        ...resolveForeshadowFsAllow(),
       ],
     },
     watch: {
@@ -103,8 +127,10 @@ export default defineConfig(({ mode, command }) => {
 
   // Optimize dependency pre-building
   optimizeDeps: {
-    // Exclude dependencies that need to be dynamically loaded
-    exclude: [],
+    // Keep @foreshadow/core out of the prebundle so resolve.alias (os/path shims)
+    // apply. Prebundling produced `.vite/deps/@foreshadow_core.js` with a broken
+    // Node `os` stub (`os.platform is not a function` on settings open).
+    exclude: ['@foreshadow/core'],
     // Force pre-building dependencies
     // Resolve Vite 7 and React 18 compatibility issues
     include: [

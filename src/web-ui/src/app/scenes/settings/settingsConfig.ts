@@ -17,6 +17,7 @@ export type ConfigTab =
   | 'voice-input'
   | 'review'
   | 'memories'
+  | 'foreshadow'
   | 'mcp-tools'
   | 'external-sources'
   | 'hooks'
@@ -234,6 +235,20 @@ export const SETTINGS_CATEGORIES: ConfigCategoryDef[] = [
           'rollout',
           'learning',
           'knowledge',
+        ],
+      },
+      {
+        id: 'foreshadow',
+        labelKey: 'configCenter.tabs.foreshadow',
+        descriptionKey: 'configCenter.tabDescriptions.foreshadow',
+        keywords: [
+          'foreshadow',
+          'activity context',
+          'context capture',
+          'editor context',
+          'terminal context',
+          'task recognize',
+          'workspace context',
         ],
       },
       {

@@ -171,7 +171,8 @@ fn config_value_for_persistence(config: &GlobalConfig) -> BitFunResult<Value> {
     let mut value = serde_json::to_value(config)
         .map_err(|e| BitFunError::config(format!("Failed to serialize config: {}", e)))?;
     prune_default_ai_tool_argument_json_repair(&mut value);
-    prune_default_memories_config(&mut value)?;
+    prune_default_section_config::<MemoriesConfig>(&mut value, "memories")?;
+    prune_default_section_config::<ForeshadowConfig>(&mut value, "foreshadow")?;
     Ok(value)
 }
 
@@ -185,31 +186,34 @@ fn prune_default_ai_tool_argument_json_repair(config_value: &mut Value) {
     }
 }
 
-fn prune_default_memories_config(config_value: &mut Value) -> BitFunResult<()> {
+fn prune_default_section_config<T>(config_value: &mut Value, section_key: &str) -> BitFunResult<()>
+where
+    T: Default + Serialize,
+{
     let Some(config_object) = config_value.as_object_mut() else {
         return Ok(());
     };
-    let Some(memories_value) = config_object.get_mut("memories") else {
+    let Some(section_value) = config_object.get_mut(section_key) else {
         return Ok(());
     };
 
-    let default_memories = serde_json::to_value(MemoriesConfig::default()).map_err(|e| {
+    let default_section = serde_json::to_value(T::default()).map_err(|e| {
         BitFunError::config(format!(
-            "Failed to serialize default memories config: {}",
-            e
+            "Failed to serialize default {} config: {}",
+            section_key, e
         ))
     })?;
-    let Some(default_memories_object) = default_memories.as_object() else {
+    let Some(default_section_object) = default_section.as_object() else {
         return Ok(());
     };
-    let Some(memories_object) = memories_value.as_object_mut() else {
+    let Some(section_object) = section_value.as_object_mut() else {
         return Ok(());
     };
 
-    memories_object.retain(|key, value| default_memories_object.get(key) != Some(value));
+    section_object.retain(|key, value| default_section_object.get(key) != Some(value));
 
-    if memories_object.is_empty() {
-        config_object.remove("memories");
+    if section_object.is_empty() {
+        config_object.remove(section_key);
     }
 
     Ok(())
@@ -1099,6 +1103,7 @@ mod tests {
             config_value_for_persistence(&config).expect("config should serialize for persistence");
 
         assert!(value.get("memories").is_none());
+        assert!(value.get("foreshadow").is_none());
         assert!(value["ai"].get("agent_models").is_none());
         assert!(value["ai"].get("allow_tool_json_repair").is_none());
     }
@@ -1137,6 +1142,24 @@ mod tests {
             Some(&serde_json::json!({
                 "generate_for_btw_sessions": true,
                 "max_rollouts_per_startup": 12
+            }))
+        );
+    }
+
+    #[test]
+    fn persistence_keeps_only_non_default_foreshadow_fields() {
+        let mut config = GlobalConfig::default();
+        config.foreshadow.enabled = true;
+        config.foreshadow.task_model = Some("fast".to_string());
+
+        let value =
+            config_value_for_persistence(&config).expect("config should serialize for persistence");
+
+        assert_eq!(
+            value.get("foreshadow"),
+            Some(&serde_json::json!({
+                "enabled": true,
+                "task_model": "fast"
             }))
         );
     }

@@ -72,6 +72,7 @@ impl StaticToolProviderFactory<dyn Tool> for ProductConcreteToolFactory {
             "ControlHub" => Some(Arc::new(ControlHubTool::new())),
             "ComputerUse" => Some(Arc::new(ComputerUseTool::new())),
             "Playbook" => Some(Arc::new(PlaybookTool::new())),
+            "foreshadow_get_context" => Some(Arc::new(ForeshadowGetContextTool::new())),
             _ => None,
         }
     }

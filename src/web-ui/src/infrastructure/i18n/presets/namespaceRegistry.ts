@@ -31,6 +31,7 @@ export const ALL_NAMESPACES = [
   'settings/default-model',
   'settings/editor',
   'settings/external-sources',
+  'settings/foreshadow',
   'settings/hooks',
   'settings/lsp',
   'settings/mcp',

@@ -146,6 +146,9 @@ importers:
 
   src/web-ui:
     dependencies:
+      '@foreshadow/core':
+        specifier: ^0.2.1
+        version: 0.2.1
       '@monaco-editor/react':
         specifier: ^4.6.0
         version: 4.7.0(monaco-editor@0.52.2)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -836,6 +839,9 @@ packages:
 
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
+
+  '@foreshadow/core@0.2.1':
+    resolution: {integrity: sha512-4QpHFzsQJrAdnW+U357cFWxpoM4pSRfoxgMtF2Y/6L9qZagjrHvFYyeC3MGSS/dR5zy1zXQ76CbjpaFk5j0VNg==}
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -6023,6 +6029,10 @@ snapshots:
 
   '@floating-ui/utils@0.2.11':
     optional: true
+
+  '@foreshadow/core@0.2.1':
+    dependencies:
+      diff: 8.0.3
 
   '@humanfs/core@0.19.1': {}
 

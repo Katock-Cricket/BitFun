@@ -1,0 +1,69 @@
+{
+  "title": "Foreshadow",
+  "subtitle": "授权在本地工作区采集活动上下文，供 Agent 读取（编辑器、终端、Markdown）。",
+  "sections": {
+    "capture": {
+      "title": "采集",
+      "description": "仅在你启用后，对本地工作区生效。远程与对等设备工作区不可用。"
+    },
+    "task": {
+      "title": "任务识别",
+      "description": "可选的 LLM 任务识别。默认沿用 BitFun 模型链（快速模型 → 主模型）。"
+    }
+  },
+  "fields": {
+    "enabled": {
+      "label": "启用 Foreshadow 采集",
+      "description": "授权采集本地编辑器、终端与 Markdown 活动并写入工作区上下文。默认关闭。"
+    },
+    "remoteNotice": {
+      "label": "远程工作区",
+      "description": "远程或对等设备工作区不支持 Foreshadow。请打开本地工作区后再启用。"
+    },
+    "status": {
+      "label": "运行状态"
+    },
+    "dataDir": {
+      "label": "数据目录",
+      "noWorkspace": "当前无工作区。就绪后数据将保存在 {workspace}/.foreshadow/。"
+    },
+    "mcpTool": {
+      "label": "Agent 工具",
+      "description": "接入 MCP 后，Agent 将通过此工具名读取上下文（P6）。"
+    },
+    "taskRecognize": {
+      "label": "使用 LLM 识别任务",
+      "description": "允许 TaskRecognizer 周期性调用模型。关闭后仅保留采集。"
+    },
+    "taskModel": {
+      "label": "任务识别模型",
+      "description": "任务识别使用的模型。留空则跟随 BitFun 默认（快速 → 主模型）。"
+    }
+  },
+  "models": {
+    "primary": "主模型",
+    "fast": "快速模型",
+    "followDefault": "跟随默认（快速 → 主模型）"
+  },
+  "status": {
+    "ready": "当前本地工作区的采集运行时已就绪。",
+    "noWorkspace": "当前没有活动工作区。",
+    "remoteUnsupported": "远程或对等设备工作区不可用。",
+    "notAuthorized": "采集未启用。请在上方打开 Foreshadow。",
+    "notReady": "运行时尚未就绪。",
+    "internalError": "运行时错误，请查看日志。",
+    "badgeReady": "就绪",
+    "badgeUnavailable": "不可用"
+  },
+  "actions": {
+    "resetSettings": "重置 Foreshadow 设置"
+  },
+  "messages": {
+    "loading": "加载 Foreshadow 配置…",
+    "loadFailed": "加载 Foreshadow 配置失败",
+    "saved": "Foreshadow 配置已保存",
+    "saveFailed": "保存 Foreshadow 配置失败",
+    "settingsReset": "Foreshadow 设置已重置",
+    "settingsResetFailed": "重置 Foreshadow 设置失败"
+  }
+}

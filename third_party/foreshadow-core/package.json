@@ -1,0 +1,29 @@
+﻿{
+  "name": "@foreshadow/core",
+  "version": "0.2.0",
+  "description": "Foreshadow L2/L3 foundation and context (platform-agnostic) — vendored snapshot for BitFun",
+  "license": "MIT",
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": {
+      "types": "./index.ts",
+      "import": "./index.ts",
+      "default": "./index.ts"
+    }
+  },
+  "files": [
+    "index.ts",
+    "src/**/*"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "diff": "^8.0.2"
+  },
+  "keywords": [
+    "foreshadow",
+    "context",
+    "repomap"
+  ]
+}

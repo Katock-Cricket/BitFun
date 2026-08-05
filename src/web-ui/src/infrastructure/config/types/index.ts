@@ -9,6 +9,7 @@ export interface GlobalConfig {
   ai: AIConfig;
   tool_permissions: ToolPermissionConfig;
   memories: MemoriesConfig;
+  foreshadow: ForeshadowConfig;
   version: string;
   last_modified: number;
 }
@@ -56,6 +57,22 @@ export interface MemoriesConfig {
   phase2_retry_delay_seconds: number;
   extract_model?: string | null;
   consolidation_model?: string | null;
+}
+
+/**
+ * Foreshadow activity-context host settings.
+ * Default disabled (user authorization required).
+ */
+export interface ForeshadowConfig {
+  /** Master enable / user authorization for local workspace capture. */
+  enabled: boolean;
+  /** Whether TaskRecognizer may call LLM periodically. */
+  task_recognize: boolean;
+  /**
+   * Model selector for TaskRecognizer.
+   * Empty / null follows BitFun default (fast → primary).
+   */
+  task_model?: string | null;
 }
 
 export interface AppConfig {

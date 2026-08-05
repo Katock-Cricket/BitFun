@@ -1,0 +1,16 @@
+export enum EventType {
+  OpenTextDocument = 'OpenTextDocument',
+  CloseTextDocument = 'CloseTextDocument',
+  ChangeTextDocument = 'ChangeTextDocument',
+  CreateFile = 'CreateFile',
+  DeleteFile = 'DeleteFile',
+  SaveFile = 'SaveFile',
+  RenameFile = 'RenameFile',
+  MoveFile = 'MoveFile',
+  EditTextDocument = 'EditTextDocument',
+  SelectText = 'SelectText',
+  ExecuteTerminalCommand = 'ExecuteTerminalCommand',
+  CursorJump = 'CursorJump',
+  CursorJumpAndEdit = 'CursorJumpAndEdit',
+  Unknown = 'Unknown',
+}

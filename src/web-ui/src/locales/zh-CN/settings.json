@@ -33,6 +33,11 @@
         "记忆",
         "长期记忆",
         "学习"
+      ],
+      "foreshadow": [
+        "活动上下文",
+        "采集",
+        "上下文"
       ]
     },
     "tabDescriptions": {
@@ -46,6 +51,7 @@
       "voiceInput": "本地麦克风输入与语音转文字模型。",
       "review": "Review 策略、覆盖深度、容量、成本和耗时控制。",
       "memories": "自动记忆生成、注入、整理窗口与记忆模型。",
+      "foreshadow": "授权本地活动采集，供 Agent 读取编辑器、终端与 Markdown 上下文。",
       "mcpTools": "MCP 服务器与工具集成。",
       "externalSources": "加载其他 AI 应用中兼容的命令与扩展。",
       "hooks": "在 Agent 生命周期节点运行你自己的命令，与 Codex Hooks 兼容。",
@@ -71,6 +77,7 @@
       "voiceInput": "语音输入",
       "review": "审核",
       "memories": "记忆",
+      "foreshadow": "Foreshadow",
       "skills": "技能",
       "mcpTools": "MCP",
       "externalSources": "外部 AI 应用",

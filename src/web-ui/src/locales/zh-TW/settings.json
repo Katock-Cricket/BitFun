@@ -33,6 +33,11 @@
         "記憶",
         "長期記憶",
         "學習"
+      ],
+      "foreshadow": [
+        "活動上下文",
+        "採集",
+        "上下文"
       ]
     },
     "tabDescriptions": {
@@ -44,6 +49,7 @@
       "sessionPermissions": "加速工作區搜尋、工具確認與逾時、Computer use、瀏覽器與偵錯。",
       "review": "Review 策略、覆蓋深度、容量、成本和耗時控制。",
       "memories": "自動記憶生成、注入、整理窗口與記憶模型。",
+      "foreshadow": "授權本機活動採集，供 Agent 讀取編輯器、終端與 Markdown 上下文。",
       "mcpTools": "MCP 伺服器與工具集成。",
       "externalSources": "載入其他 AI 應用中相容的命令與擴充。",
       "hooks": "在 Agent 生命週期節點執行你自己的命令，與 Codex Hooks 相容。",
@@ -69,6 +75,7 @@
       "sessionPermissions": "權限管理",
       "review": "審核",
       "memories": "記憶",
+      "foreshadow": "Foreshadow",
       "skills": "技能",
       "mcpTools": "MCP",
       "externalSources": "外部 AI 應用",
