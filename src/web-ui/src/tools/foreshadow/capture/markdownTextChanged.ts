@@ -29,11 +29,26 @@ export type MarkdownDebouncePublish = (
   event: Extract<RawHostEvent, { type: 'textChanged' }>,
 ) => void | Promise<void>;
 
+/** Timer handle shared by DOM (`number`) and Node (`NodeJS.Timeout`) hosts. */
+export type ForeshadowTimerHandle = ReturnType<typeof setTimeout>;
+
+/**
+ * Narrow timer function contracts. Do NOT type these as `typeof setTimeout`:
+ * Node's `setTimeout` overloads carry `__promisify__`, which plain function
+ * fallbacks cannot satisfy, and the parameters would fall back to implicit `any`.
+ */
+export type ForeshadowSetTimeoutFn = (
+  handler: () => void,
+  timeout?: number,
+) => ForeshadowTimerHandle;
+
+export type ForeshadowClearTimeoutFn = (handle: ForeshadowTimerHandle) => void;
+
 export type MarkdownTextChangedDebouncerOptions = {
   publish: MarkdownDebouncePublish;
   debounceMs?: number;
-  setTimeoutFn?: typeof setTimeout;
-  clearTimeoutFn?: typeof clearTimeout;
+  setTimeoutFn?: ForeshadowSetTimeoutFn;
+  clearTimeoutFn?: ForeshadowClearTimeoutFn;
 };
 
 /**
@@ -43,9 +58,9 @@ export type MarkdownTextChangedDebouncerOptions = {
 export class MarkdownTextChangedDebouncer {
   private readonly publishImpl: MarkdownDebouncePublish;
   private readonly debounceMs: number;
-  private readonly setTimeoutFn: typeof setTimeout;
-  private readonly clearTimeoutFn: typeof clearTimeout;
-  private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly setTimeoutFn: ForeshadowSetTimeoutFn;
+  private readonly clearTimeoutFn: ForeshadowClearTimeoutFn;
+  private readonly timers = new Map<string, ForeshadowTimerHandle>();
   private readonly pending = new Map<string, { filePath: string; afterText: string }>();
 
   constructor(options: MarkdownTextChangedDebouncerOptions) {
@@ -55,12 +70,11 @@ export class MarkdownTextChangedDebouncer {
     // free functions can throw `TypeError: Illegal invocation` in browser/webview hosts.
     this.setTimeoutFn =
       options.setTimeoutFn ??
-      ((handler, timeout, ...args) =>
-        globalThis.setTimeout(handler as never, timeout as never, ...(args as never[])));
+      ((handler, timeout) => globalThis.setTimeout(handler, timeout));
     this.clearTimeoutFn =
       options.clearTimeoutFn ??
-      ((id) => {
-        globalThis.clearTimeout(id as never);
+      ((handle) => {
+        globalThis.clearTimeout(handle);
       });
   }
 
