@@ -47,9 +47,12 @@ export function createStubDocumentPort(): DocumentPort {
   };
 }
 
-export function createWorkspacePort(workspaceRoot: string): WorkspacePort {
+export function createWorkspacePort(workspaceRoot: string, homeDir?: string): WorkspacePort {
   const rootUri = makeUri(workspaceRoot);
-  const dataDir = joinPath(workspaceRoot, FORESHADOW_DATA_DIR_NAME);
+  const lastSeg = workspaceRoot.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || 'untitled';
+  const dataDir = homeDir
+    ? joinPath(homeDir, FORESHADOW_DATA_DIR_NAME, lastSeg)
+    : joinPath(workspaceRoot, FORESHADOW_DATA_DIR_NAME);
   const normalizedRoot = workspaceRoot.replace(/\\/g, '/').toLowerCase();
 
   return {
@@ -168,13 +171,14 @@ export function createStubLlmPort(): LLMPort {
 
 export function createStubFoundationPorts(options: {
   workspaceRoot: string;
+  homeDir?: string;
   getConfig: () => ForeshadowConfig;
   subscribeConfig?: (listener: () => void) => () => void;
 }): FoundationPorts {
   return {
     documents: createStubDocumentPort(),
     languageIntel: noopLanguageIntelPort,
-    workspace: createWorkspacePort(options.workspaceRoot),
+    workspace: createWorkspacePort(options.workspaceRoot, options.homeDir),
     search: createStubSearchPort(),
     fs: createStubFileSystemPort(),
     config: createConfigPort(options.getConfig, options.subscribeConfig),

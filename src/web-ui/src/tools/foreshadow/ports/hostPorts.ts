@@ -18,10 +18,11 @@ import {
 
 export function createBitfunFoundationPorts(options: {
   workspaceRoot: string;
+  homeDir?: string;
   getConfig: () => ForeshadowConfig;
   subscribeConfig?: (listener: () => void) => () => void;
 }): FoundationPorts {
-  const workspace = createWorkspacePort(options.workspaceRoot);
+  const workspace = createWorkspacePort(options.workspaceRoot, options.homeDir);
   const config = createConfigPort(options.getConfig, options.subscribeConfig);
 
   return {

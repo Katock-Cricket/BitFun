@@ -1,15 +1,17 @@
 /**
  * Per-workspace Foreshadow Runtime map with host gate checks.
  *
- * Gates (SPEC D10/D12/D13/D14):
+ * Gates (SPEC D10/D12/D13):
  * - no workspace → NO_WORKSPACE
  * - remote workspace / peer mode → REMOTE_UNSUPPORTED
- * - foreshadow.enabled !== true → NOT_AUTHORIZED
+ *
+ * The runtime is always-on: no user setting or authorization is required.
  */
 import {
   FoundationRuntime,
   type RawHostEvent,
 } from '@foreshadow/core';
+import { homeDir, join } from '@tauri-apps/api/path';
 import { createLogger } from '@/shared/utils/logger';
 import { isRemoteWorkspace, type WorkspaceInfo } from '@/shared/types';
 import { isPeerDeviceModeActive } from '@/infrastructure/peer-device/peerModeFlag';
@@ -26,7 +28,7 @@ import {
 const log = createLogger('ForeshadowRuntimeMap');
 
 const DEFAULT_FORESHADOW_CONFIG: ForeshadowConfig = {
-  enabled: false,
+  enabled: true,
   task_recognize: true,
   task_model: null,
 };
@@ -48,12 +50,22 @@ function joinDataDir(workspaceRoot: string): string {
   return `${workspaceRoot.replace(/[\\/]+$/, '')}${sep}${FORESHADOW_DATA_DIR_NAME}`;
 }
 
+function buildDataDir(workspaceRoot: string, homeDir?: string | null): string {
+  if (homeDir) {
+    const lastSeg = workspaceRoot.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || 'untitled';
+    const sep = homeDir.includes('\\') && !homeDir.includes('/') ? '\\' : '/';
+    return `${homeDir.replace(/[\\/]+$/, '')}${sep}${FORESHADOW_DATA_DIR_NAME}${sep}${lastSeg}`;
+  }
+  return joinDataDir(workspaceRoot);
+}
+
 export function evaluateForeshadowGate(options: {
   workspace: WorkspaceInfo | null;
   config: ForeshadowConfig;
   peerModeActive?: boolean;
+  homeDir?: string | null;
 }): ForeshadowRuntimeStatus {
-  const { workspace, config } = options;
+  const { workspace } = options;
   const peerModeActive = options.peerModeActive ?? isPeerDeviceModeActive();
 
   if (!workspace?.rootPath) {
@@ -72,19 +84,11 @@ export function evaluateForeshadowGate(options: {
     };
   }
 
-  if (!config.enabled) {
-    return {
-      kind: 'unavailable',
-      code: 'NOT_AUTHORIZED',
-      message: 'Foreshadow capture is disabled; enable it in Settings',
-    };
-  }
-
   return {
     kind: 'ready',
     workspaceKey: workspace.id || workspace.rootPath,
     workspacePath: workspace.rootPath,
-    dataDir: joinDataDir(workspace.rootPath),
+    dataDir: buildDataDir(workspace.rootPath, options.homeDir),
   };
 }
 
@@ -101,12 +105,19 @@ class ForeshadowRuntimeMap {
   private configListeners = new Set<() => void>();
   private started = false;
   private unsubscribers: Array<() => void> = [];
+  private bitfunHomeDir: string | null = null;
 
   async start(): Promise<void> {
     if (this.started) {
       return;
     }
     this.started = true;
+
+    try {
+      this.bitfunHomeDir = await join(await homeDir(), '.bitfun');
+    } catch (error) {
+      log.warn('Failed to resolve BitFun home directory; falling back to workspace-relative storage', { error });
+    }
 
     try {
       const loaded = await configManager.getConfig<Partial<ForeshadowConfig>>('foreshadow');
@@ -148,13 +159,13 @@ class ForeshadowRuntimeMap {
       log.error('Failed to start foreshadow capture bridge', { error });
     }
 
-    // MCP/tool request bridge: always listen so gated/error payloads can be returned.
-    try {
-      const { startForeshadowContextBridge } = await import('./contextBridge');
-      startForeshadowContextBridge();
-    } catch (error) {
-      log.error('Failed to start foreshadow context bridge', { error });
-    }
+    // MCP/tool request bridge is started eagerly from App.tsx on mount (not
+    // here) so the `agentic://foreshadow-get-context` listener is registered
+    // as early as possible — before the deferred startup gate completes. This
+    // prevents foreshadow_get_context tool calls from timing out (15s) when the
+    // agent invokes the tool before deferred foreshadow initialization finishes.
+    // The bridge replies with NO_WORKSPACE / NOT_READY when the runtime map is
+    // not ready yet, which is a fast structured error instead of a silent hang.
 
     log.info('Foreshadow runtime map started', {
       enabled: this.config.enabled,
@@ -212,6 +223,7 @@ class ForeshadowRuntimeMap {
     return evaluateForeshadowGate({
       workspace: resolved,
       config: this.config,
+      homeDir: this.bitfunHomeDir,
     });
   }
 
@@ -270,6 +282,19 @@ class ForeshadowRuntimeMap {
     };
   }
 
+  /**
+   * Get the real Foreshadow data directory for a workspace.
+   * Uses BitFun home (~/.bitfun) when available, falling back to workspace-relative.
+   */
+  getDataDir(workspace?: WorkspaceInfo | null): string | null {
+    const resolved =
+      workspace === undefined ? workspaceManager.getState().currentWorkspace : workspace;
+    if (!resolved?.rootPath) {
+      return null;
+    }
+    return buildDataDir(resolved.rootPath, this.bitfunHomeDir);
+  }
+
   private async reloadConfig(): Promise<void> {
     try {
       const loaded = await configManager.getConfig<Partial<ForeshadowConfig>>('foreshadow');
@@ -304,6 +329,7 @@ class ForeshadowRuntimeMap {
     const status = evaluateForeshadowGate({
       workspace,
       config: this.config,
+      homeDir: this.bitfunHomeDir,
     });
 
     if (status.kind !== 'ready') {
@@ -333,6 +359,7 @@ class ForeshadowRuntimeMap {
     try {
       const ports = createBitfunFoundationPorts({
         workspaceRoot: workspacePath,
+        homeDir: this.bitfunHomeDir ?? undefined,
         getConfig: () => this.config,
         subscribeConfig: (listener) => this.subscribeConfig(listener),
       });

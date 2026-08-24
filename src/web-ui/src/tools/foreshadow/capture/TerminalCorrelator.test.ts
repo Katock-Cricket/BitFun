@@ -230,6 +230,26 @@ describe('TerminalCorrelator', () => {
     expect(published.filter((e) => e.phase === 'end')[0]?.output).toBe('body');
   });
 
+  it('sanitizes raw PTY output (backspaces / ANSI / CR) before publishing end', () => {
+    const published: Published[] = [];
+    const correlator = new TerminalCorrelator({
+      publish: (event) => {
+        published.push(event);
+      },
+      finishSettleMs: 0,
+    });
+
+    correlator.handleRawEvent(started('s1', 'cd', 'c1'));
+    correlator.handleRawEvent(data('s1', '\u001B[32m$ cd\u001B[0m\r\n'));
+    correlator.handleRawEvent(data('s1', 'c\bcdcd cd fcd focd\r\n'));
+    correlator.handleRawEvent(finished('s1', 'c1'));
+
+    const end = published.find((e) => e.phase === 'end');
+    expect(end?.output).toBe('$ cd\ncdcd cd fcd focd\n');
+    expect(end?.output).not.toContain('\b');
+    expect(end?.output).not.toContain('\u001B');
+  });
+
   it('flushes active buffer on SessionDestroyed', () => {
     const published: Published[] = [];
     const correlator = new TerminalCorrelator({

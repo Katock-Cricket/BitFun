@@ -68,6 +68,18 @@ class ForeshadowCaptureBridge {
     this.markdownDebouncer.notify(filePath, afterText);
   }
 
+  /**
+   * Seed the Markdown `beforeText` baseline when the editor loads or replaces
+   * content from disk, so the first user edit carries a real before/after diff.
+   * Safe to call when bridge is not started.
+   */
+  seedMarkdownBaseline(filePath: string | undefined | null, content: string): void {
+    if (!filePath || !this.started || !this.markdownDebouncer) {
+      return;
+    }
+    this.markdownDebouncer.seedBaseline(filePath, content);
+  }
+
   async start(): Promise<void> {
     if (this.started) {
       return;

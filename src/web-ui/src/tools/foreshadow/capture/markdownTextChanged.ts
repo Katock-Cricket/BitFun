@@ -2,7 +2,10 @@
  * TipTap / Markdown after-only textChanged helpers (SPEC P4 / B14).
  *
  * Markdown has no fine-grained Monaco-style TextChange batches.
- * L2 accepts empty `changes` + optional `afterText`.
+ * L2 accepts empty `changes` + optional `beforeText` / `afterText`.
+ * The debouncer attaches the last known content as `beforeText` so L2 can record
+ * a real file-level Edit; without a baseline L2 skips the Edit instead of
+ * fabricating a whole-file diff from '' → afterText.
  */
 import type { RawHostEvent } from '@foreshadow/core';
 import { normalizeFsPath, toFsUri } from './uri';
@@ -12,15 +15,18 @@ export const FORESHADOW_MARKDOWN_TEXT_DEBOUNCE_MS = 400;
 
 /**
  * Build a Foreshadow textChanged event for Markdown full-document updates.
+ * `beforeText` is the last known content (omitted for the first observed edit).
  */
 export function buildMarkdownAfterOnlyTextChanged(
   filePath: string,
   afterText: string,
+  beforeText?: string,
 ): Extract<RawHostEvent, { type: 'textChanged' }> {
   return {
     type: 'textChanged',
     uri: toFsUri(filePath),
     changes: [],
+    beforeText,
     afterText,
   };
 }
@@ -62,6 +68,11 @@ export class MarkdownTextChangedDebouncer {
   private readonly clearTimeoutFn: ForeshadowClearTimeoutFn;
   private readonly timers = new Map<string, ForeshadowTimerHandle>();
   private readonly pending = new Map<string, { filePath: string; afterText: string }>();
+  /**
+   * Last known content per normalized path. Doubles as the no-op dedupe cache and
+   * as the `beforeText` baseline for the next published Edit.
+   */
+  private readonly lastPublished = new Map<string, string>();
 
   constructor(options: MarkdownTextChangedDebouncerOptions) {
     this.publishImpl = options.publish;
@@ -83,12 +94,21 @@ export class MarkdownTextChangedDebouncer {
       return;
     }
     const key = normalizeFsPath(filePath);
-    this.pending.set(key, { filePath, afterText });
 
     const existing = this.timers.get(key);
     if (existing) {
       this.clearTimeoutFn(existing);
+      this.timers.delete(key);
     }
+
+    // Content unchanged since the last publish (cursor/selection churn, undo back
+    // to the saved state, external re-sync): do not fabricate an Edit event.
+    if (this.lastPublished.get(key) === afterText) {
+      this.pending.delete(key);
+      return;
+    }
+
+    this.pending.set(key, { filePath, afterText });
 
     if (this.debounceMs <= 0) {
       this.flushKey(key);
@@ -123,10 +143,30 @@ export class MarkdownTextChangedDebouncer {
     }
     this.timers.clear();
     this.pending.clear();
+    this.lastPublished.clear();
   }
 
   get pendingCount(): number {
     return this.pending.size;
+  }
+
+  /**
+   * Record the current content of a file as the `beforeText` baseline, e.g. when
+   * the editor loads or reloads content from disk. Any pending debounced edit for
+   * the path is discarded because it was computed against the replaced content.
+   */
+  seedBaseline(filePath: string, content: string): void {
+    if (!filePath.trim()) {
+      return;
+    }
+    const key = normalizeFsPath(filePath);
+    const timer = this.timers.get(key);
+    if (timer) {
+      this.clearTimeoutFn(timer);
+      this.timers.delete(key);
+    }
+    this.pending.delete(key);
+    this.lastPublished.set(key, content);
   }
 
   private flushKey(key: string): void {
@@ -135,8 +175,11 @@ export class MarkdownTextChangedDebouncer {
       return;
     }
     this.pending.delete(key);
+    // Snapshot the baseline before overwriting it with the new content.
+    const beforeText = this.lastPublished.get(key);
+    this.lastPublished.set(key, item.afterText);
     void this.publishImpl(
-      buildMarkdownAfterOnlyTextChanged(item.filePath, item.afterText),
+      buildMarkdownAfterOnlyTextChanged(item.filePath, item.afterText, beforeText),
     );
   }
 }

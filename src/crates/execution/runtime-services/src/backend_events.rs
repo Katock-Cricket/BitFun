@@ -62,6 +62,16 @@ impl BackendEventSystem {
         *e = Some(emitter);
     }
 
+    /// Whether a frontend-facing emitter has been wired up yet.
+    ///
+    /// Tools that emit `BackendEvent::Custom` can consult this to fail fast
+    /// instead of waiting out the full FE response timeout when the backend
+    /// event bridge has not been initialized (e.g. during early desktop startup
+    /// or in headless/CLI runs without a transport emitter).
+    pub async fn has_emitter(&self) -> bool {
+        self.emitter.lock().await.is_some()
+    }
+
     pub async fn emit(&self, event: BackendEvent) -> Result<()> {
         trace!("Emitting event: {:?}", event);
 

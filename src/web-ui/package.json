@@ -18,7 +18,7 @@
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@foreshadow/core": "^0.2.1",
+    "@foreshadow/core": "^0.2.5",
     "@monaco-editor/react": "^4.6.0",
     "@tanstack/react-virtual": "^3.13.23",
     "@tauri-apps/api": "^2.10.1",

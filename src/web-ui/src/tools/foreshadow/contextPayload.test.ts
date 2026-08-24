@@ -18,7 +18,7 @@ describe('buildForeshadowContextPayload', () => {
     getSnapshot.mockReset();
   });
 
-  it('returns success shell with context from getSnapshot', () => {
+  it('returns success shell with only the abstract from getSnapshot', () => {
     getSnapshot.mockReturnValue({
       ok: true,
       workspacePath: 'D:/ws',
@@ -30,7 +30,7 @@ describe('buildForeshadowContextPayload', () => {
         completeness: 0.3,
         logs: [{ event: 'edit' }],
         tasks: [],
-        abstract: 'no task yet',
+        abstract: "#User's current task and intention\nedit a file",
       },
     });
 
@@ -38,25 +38,44 @@ describe('buildForeshadowContextPayload', () => {
     expect(payload).toMatchObject({
       schemaVersion: 1,
       workspacePath: 'D:/ws',
-      context: { history: [], cursor: null },
-      completeness: 0.3,
-      logs: [{ event: 'edit' }],
-      abstract: 'no task yet',
+      abstract: "#User's current task and intention\nedit a file",
     });
     expect('generatedAt' in payload && typeof payload.generatedAt).toBe('string');
+    // Abstract-only contract: no raw context / logs / tasks leak into the payload.
+    if (!('ok' in payload && payload.ok === false)) {
+      expect(payload).not.toHaveProperty('context');
+      expect(payload).not.toHaveProperty('logs');
+      expect(payload).not.toHaveProperty('tasks');
+      expect(payload).not.toHaveProperty('completeness');
+    }
+  });
+
+  it('falls back to an empty abstract when snapshot has none', () => {
+    getSnapshot.mockReturnValue({
+      ok: true,
+      workspacePath: 'D:/ws',
+      snapshot: { context: { history: [] } },
+    });
+
+    const payload = buildForeshadowContextPayload();
+    expect(payload).toMatchObject({
+      schemaVersion: 1,
+      workspacePath: 'D:/ws',
+      abstract: '',
+    });
   });
 
   it('propagates gate errors from getSnapshot', () => {
     getSnapshot.mockReturnValue({
       ok: false,
-      code: 'NOT_AUTHORIZED',
-      message: 'disabled',
+      code: 'NO_WORKSPACE',
+      message: 'no active workspace',
     });
 
     expect(buildForeshadowContextPayload()).toEqual({
       ok: false,
-      code: 'NOT_AUTHORIZED',
-      message: 'disabled',
+      code: 'NO_WORKSPACE',
+      message: 'no active workspace',
     });
   });
 
@@ -87,14 +106,14 @@ describe('buildForeshadowContextPayload', () => {
     getSnapshot.mockReturnValue({
       ok: true,
       workspacePath: 'D:\\ws-a',
-      snapshot: { context: { ok: true } },
+      snapshot: { context: { ok: true }, abstract: 'abs-a' },
     });
 
     const payload = buildForeshadowContextPayload('D:/ws-a/');
     expect(payload).toMatchObject({
       schemaVersion: 1,
       workspacePath: 'D:\\ws-a',
-      context: { ok: true },
+      abstract: 'abs-a',
     });
   });
 });

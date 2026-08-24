@@ -10,6 +10,7 @@
  */
 import type { RawHostEvent } from '@foreshadow/core';
 import { createLogger } from '@/shared/utils/logger';
+import { sanitizeTerminalOutput } from './sanitizeTerminalOutput';
 import { truncateTerminalOutput } from './truncateTerminalOutput';
 
 const log = createLogger('ForeshadowTerminalCorrelator');
@@ -213,7 +214,7 @@ export class TerminalCorrelator {
   private flushEnd(sessionId: string, active: ActiveCommand): void {
     this.clearFinishTimer(active);
     this.activeBySession.delete(sessionId);
-    const joined = active.chunks.join('');
+    const joined = sanitizeTerminalOutput(active.chunks.join(''));
     const output = truncateTerminalOutput(joined);
     void this.safePublish({
       type: 'terminalCommand',

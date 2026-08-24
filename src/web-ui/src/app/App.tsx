@@ -320,6 +320,30 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [verifyMainWindowVisible]);
 
+  // Start the foreshadow context bridge eagerly on mount (not deferred) so the
+  // `agentic://foreshadow-get-context` listener is registered before the agent
+  // can invoke the tool. Until the runtime map initializes (deferred), the
+  // bridge replies with NO_WORKSPACE / NOT_READY instead of hanging the tool
+  // for the full FE response timeout.
+  useEffect(() => {
+    let disposed = false;
+    void import('@/tools/foreshadow/contextBridge')
+      .then(({ startForeshadowContextBridge }) => {
+        if (!disposed) {
+          startForeshadowContextBridge();
+        }
+      })
+      .catch(error => {
+        log.warn('Failed to start foreshadow context bridge on mount', error);
+      });
+    return () => {
+      disposed = true;
+      void import('@/tools/foreshadow/contextBridge')
+        .then(({ stopForeshadowContextBridge }) => stopForeshadowContextBridge())
+        .catch(() => {});
+    };
+  }, []);
+
   // Non-critical systems are delayed until the shell is interactive and the
   // startup overlay has fully handed off to the app surface.
   useEffect(() => {

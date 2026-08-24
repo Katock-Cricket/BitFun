@@ -2,7 +2,6 @@
 export type ForeshadowUnavailableCode =
   | 'NO_WORKSPACE'
   | 'REMOTE_UNSUPPORTED'
-  | 'NOT_AUTHORIZED'
   | 'NOT_READY'
   | 'INTERNAL_ERROR';
 

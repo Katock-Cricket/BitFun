@@ -839,8 +839,15 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
         (container as any).__monacoEditor = editor;
         
         if (model) {
-          const { lspDocumentService } = await import('@/tools/lsp/services/LspDocumentService');
-          lspDocumentService.associateEditor(model.uri.toString(), editor);
+          // LSP association is an enhancement, not a prerequisite for the editor.
+          // Do not let a dynamic-import failure (e.g. stale Vite dev chunk after a
+          // dependency reinstall) abort the whole editor initialization.
+          try {
+            const { lspDocumentService } = await import('@/tools/lsp/services/LspDocumentService');
+            lspDocumentService.associateEditor(model.uri.toString(), editor);
+          } catch (lspImportError) {
+            log.warn('Failed to associate editor with LSP document service', { lspImportError });
+          }
         }
         
         const hasContent = model && model.getValue().length > 0;

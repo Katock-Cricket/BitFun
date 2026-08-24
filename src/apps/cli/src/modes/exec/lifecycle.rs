@@ -127,10 +127,19 @@ pub(super) struct ExecJsonResult {
     patch: Option<ExecPatchOutput>,
     #[serde(skip_serializing_if = "Option::is_none")]
     verification: Option<super::verification::VerifyOutcome>,
+    /// Total tool calls (including subagent) across all model rounds.
+    tool_call_count: usize,
+    /// Number of model-round API calls (dialog turns within exec).
+    model_round_count: usize,
+    /// Whether `foreshadow_get_context` was called at least once.
+    foreshadow_called: bool,
+    /// Names of tools that were invoked (deduplicated, order of first call).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    tool_names: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-pub(super) struct ExecPatchOutput {
+pub(super) struct ExecPatchOutput { 
     pub(super) target: String,
     pub(super) status: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -334,6 +343,10 @@ impl ExecJsonResult {
         turn_id: impl Into<String>,
         result: impl Into<String>,
         usage: Option<ExecTokenUsage>,
+        tool_call_count: usize,
+        model_round_count: usize,
+        foreshadow_called: bool,
+        tool_names: Vec<String>,
     ) -> Self {
         Self::new(
             "success",
@@ -342,6 +355,10 @@ impl ExecJsonResult {
             Some(turn_id.into()),
             result,
             usage,
+            tool_call_count,
+            model_round_count,
+            foreshadow_called,
+            tool_names,
         )
     }
 
@@ -350,6 +367,10 @@ impl ExecJsonResult {
         turn_id: impl Into<String>,
         result: impl Into<String>,
         usage: Option<ExecTokenUsage>,
+        tool_call_count: usize,
+        model_round_count: usize,
+        foreshadow_called: bool,
+        tool_names: Vec<String>,
     ) -> Self {
         Self::new(
             "error",
@@ -358,15 +379,19 @@ impl ExecJsonResult {
             Some(turn_id.into()),
             result,
             usage,
+            tool_call_count,
+            model_round_count,
+            foreshadow_called,
+            tool_names,
         )
     }
 
     fn session_error(session_id: impl Into<String>, result: impl Into<String>) -> Self {
-        Self::new("error", true, Some(session_id.into()), None, result, None)
+        Self::new("error", true, Some(session_id.into()), None, result, None, 0, 0, false, vec![])
     }
 
     pub(super) fn preflight_error(result: impl Into<String>) -> Self {
-        Self::new("error", true, None, None, result, None)
+        Self::new("error", true, None, None, result, None, 0, 0, false, vec![])
     }
 
     pub(super) fn cancelled(
@@ -374,6 +399,10 @@ impl ExecJsonResult {
         turn_id: impl Into<String>,
         result: impl Into<String>,
         usage: Option<ExecTokenUsage>,
+        tool_call_count: usize,
+        model_round_count: usize,
+        foreshadow_called: bool,
+        tool_names: Vec<String>,
     ) -> Self {
         Self::new(
             "cancelled",
@@ -382,6 +411,10 @@ impl ExecJsonResult {
             Some(turn_id.into()),
             result,
             usage,
+            tool_call_count,
+            model_round_count,
+            foreshadow_called,
+            tool_names,
         )
     }
 
@@ -392,6 +425,10 @@ impl ExecJsonResult {
         turn_id: Option<String>,
         result: impl Into<String>,
         usage: Option<ExecTokenUsage>,
+        tool_call_count: usize,
+        model_round_count: usize,
+        foreshadow_called: bool,
+        tool_names: Vec<String>,
     ) -> Self {
         Self {
             kind: "result",
@@ -403,6 +440,10 @@ impl ExecJsonResult {
             usage,
             patch: None,
             verification: None,
+            tool_call_count,
+            model_round_count,
+            foreshadow_called,
+            tool_names,
         }
     }
 
@@ -716,6 +757,9 @@ impl ExecMode {
 
         // Observe the shared Agentic event stream without consuming other clients' events.
         let mut total_tool_calls = 0usize;
+        let mut model_round_count = 0usize;
+        let mut foreshadow_called = false;
+        let mut tool_names: Vec<String> = Vec::new();
         let mut subagent_parent_turns: HashMap<String, (String, String)> = HashMap::new();
         let mut terminal_outcome: Option<Result<()>> = None;
         let mut terminal_status: Option<ExecTerminalStatus> = None;
@@ -942,6 +986,9 @@ impl ExecMode {
                     &mut assistant_text,
                     &mut usage,
                     &mut total_tool_calls,
+                    &mut model_round_count,
+                    &mut foreshadow_called,
+                    &mut tool_names,
                 )
                 .await?;
             }
@@ -973,6 +1020,9 @@ impl ExecMode {
                         &mut assistant_text,
                         &mut usage,
                         &mut total_tool_calls,
+                        &mut model_round_count,
+                        &mut foreshadow_called,
+                        &mut tool_names,
                     )
                     .await?;
             }
@@ -1188,13 +1238,13 @@ impl ExecMode {
             let result_text = terminal_message.unwrap_or(assistant_text);
             let result = match terminal_status.unwrap_or(ExecTerminalStatus::Error) {
                 ExecTerminalStatus::Success => {
-                    ExecJsonResult::success(&session_id, &turn_id, result_text, usage)
+                    ExecJsonResult::success(&session_id, &turn_id, result_text, usage, total_tool_calls, model_round_count, foreshadow_called, tool_names.clone())
                 }
                 ExecTerminalStatus::Error => {
-                    ExecJsonResult::error(&session_id, &turn_id, result_text, usage)
+                    ExecJsonResult::error(&session_id, &turn_id, result_text, usage, total_tool_calls, model_round_count, foreshadow_called, tool_names.clone())
                 }
                 ExecTerminalStatus::Cancelled => {
-                    ExecJsonResult::cancelled(&session_id, &turn_id, result_text, usage)
+                    ExecJsonResult::cancelled(&session_id, &turn_id, result_text, usage, total_tool_calls, model_round_count, foreshadow_called, tool_names.clone())
                 }
             }
             .with_patch(patch);
@@ -1248,6 +1298,9 @@ impl ExecMode {
         assistant_text: &mut String,
         usage: &mut Option<ExecTokenUsage>,
         total_tool_calls: &mut usize,
+        model_round_count: &mut usize,
+        foreshadow_called: &mut bool,
+        tool_names: &mut Vec<String>,
     ) -> Result<()> {
         self.emit_stream_envelope(envelope)?;
         let event = &envelope.event;
@@ -1261,14 +1314,18 @@ impl ExecMode {
                 turn_id: event_turn_id,
                 model_config_id,
                 ..
+            } if event_turn_id == turn_id => {
+                self.record_resolved_model_config_id(session_id, model_config_id)
+                    .await;
             }
-            | AgenticEvent::ModelRoundCompleted {
+            AgenticEvent::ModelRoundCompleted {
                 turn_id: event_turn_id,
                 model_config_id,
                 ..
             } if event_turn_id == turn_id => {
                 self.record_resolved_model_config_id(session_id, model_config_id)
                     .await;
+                *model_round_count += 1;
             }
             AgenticEvent::TextChunk {
                 turn_id: event_turn_id,
@@ -1305,6 +1362,12 @@ impl ExecMode {
                         let (tool_name, input) = effective_event_invocation(identity, params);
                         self.print_tool_start_details(tool_name, &identity.tool_id, input);
                         *total_tool_calls += 1;
+                        if tool_name == "foreshadow_get_context" {
+                            *foreshadow_called = true;
+                        }
+                        if !tool_names.contains(&tool_name.to_string()) {
+                            tool_names.push(tool_name.to_string());
+                        }
                     }
                     ToolEventData::Progress { message, .. } => {
                         self.print_text(|| eprintln!("   In progress: {}", message));

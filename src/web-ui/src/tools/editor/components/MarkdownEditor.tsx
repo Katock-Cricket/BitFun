@@ -220,6 +220,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         setContent(nextContent);
         setHasChanges(false);
         lastReportedDirtyRef.current = false;
+        // Foreshadow: the loaded content is the before-baseline for the first edit.
+        foreshadowCaptureBridge.seedMarkdownBaseline(filePath, nextContent);
         setTimeout(() => {
           editorRef.current?.setInitialContent?.(nextContent);
         }, 0);
@@ -360,6 +362,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         setHasChanges(false);
         lastReportedDirtyRef.current = false;
         onContentChangeRef.current?.(nextContent, false);
+        // Foreshadow: disk-replaced content becomes the new before-baseline.
+        foreshadowCaptureBridge.seedMarkdownBaseline(filePath, nextContent);
         setTimeout(() => {
           editorRef.current?.setInitialContent?.(nextContent);
         }, 0);
@@ -498,6 +502,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               lastReportedDirtyRef.current = false;
               editorRef.current?.markSaved?.();
               onContentChangeRef.current?.(nextContent, false);
+              // Foreshadow: conflict-reload replaces the before-baseline.
+              foreshadowCaptureBridge.seedMarkdownBaseline(filePath, nextContent);
               setTimeout(() => {
                 editorRef.current?.setInitialContent?.(nextContent);
               }, 0);

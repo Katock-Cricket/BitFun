@@ -2,9 +2,13 @@
  * Build the foreshadow_get_context tool payload (SPEC §4).
  *
  * Success shell:
- *   { schemaVersion: 1, workspacePath, generatedAt, context: toJSONObject() }
+ *   { schemaVersion: 1, workspacePath, generatedAt, abstract }
  * Error shell:
  *   { ok: false, code, message }
+ *
+ * The payload is abstract-only by design: the human-readable Foreshadow
+ * `toAbstract()` summary is what grounds the agent; the raw `toJSONObject()`
+ * context, logs, and tasks bloat the tool result without adding signal.
  */
 import { foreshadowRuntimeMap } from './runtimeMap';
 import type { ForeshadowUnavailableCode } from './types';
@@ -15,16 +19,8 @@ export type ForeshadowContextSuccessPayload = {
   schemaVersion: typeof FORESHADOW_CONTEXT_SCHEMA_VERSION;
   workspacePath: string;
   generatedAt: string;
-  /** Foreshadow L3 `toJSONObject()` body (SPEC §4). */
-  context: unknown;
-  /** 0–1 completeness score from core (helps diagnose empty capture). */
-  completeness?: number;
-  /** Recent raw log items (last ~20) for richer agent grounding. */
-  logs?: unknown;
-  /** Recent tasks (last ~5). */
-  tasks?: unknown;
-  /** Human-readable abstract of current Foreshadow state. */
-  abstract?: string;
+  /** Human-readable abstract of current Foreshadow state (`toAbstract()`). */
+  abstract: string;
 };
 
 export type ForeshadowContextErrorPayload = {
@@ -76,17 +72,13 @@ export function buildForeshadowContextPayload(
     }
 
     const { snapshot } = result;
+    const abstract =
+      typeof snapshot.abstract === 'string' ? snapshot.abstract : '';
     return {
       schemaVersion: FORESHADOW_CONTEXT_SCHEMA_VERSION,
       workspacePath: result.workspacePath,
       generatedAt: new Date().toISOString(),
-      context: snapshot.context,
-      // Extra diagnostic / grounding fields from FoundationRuntime.getSnapshot().
-      // Keep `context` as the SPEC primary body; these help when context is sparse.
-      completeness: snapshot.completeness,
-      logs: snapshot.logs,
-      tasks: snapshot.tasks,
-      abstract: snapshot.abstract,
+      abstract,
     };
   } catch (error) {
     const message =

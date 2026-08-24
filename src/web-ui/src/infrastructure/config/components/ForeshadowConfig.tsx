@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RotateCcw } from 'lucide-react';
+import { FolderOpen, RotateCcw } from 'lucide-react';
 import {
   ConfigPageLoading,
   IconButton,
@@ -13,8 +13,8 @@ import { createLogger } from '@/shared/utils/logger';
 import { isRemoteWorkspace } from '@/shared/types';
 import { isPeerDeviceModeActive } from '@/infrastructure/peer-device/peerModeFlag';
 import { workspaceManager } from '@/infrastructure/services/business/workspaceManager';
+import { workspaceAPI } from '@/infrastructure/api/service-api/WorkspaceAPI';
 import {
-  FORESHADOW_DATA_DIR_NAME,
   FORESHADOW_MCP_TOOL_NAME,
   foreshadowRuntimeMap,
   normalizeForeshadowConfig,
@@ -34,7 +34,7 @@ import {
 const log = createLogger('ForeshadowConfig');
 
 const DEFAULT_FORESHADOW_CONFIG: ForeshadowConfigShape = {
-  enabled: false,
+  enabled: true,
   task_recognize: true,
   task_model: null,
 };
@@ -42,11 +42,6 @@ const DEFAULT_FORESHADOW_CONFIG: ForeshadowConfigShape = {
 function normalizeSelectValue(value: string | number | (string | number)[]): string {
   const resolved = Array.isArray(value) ? value[0] : value;
   return resolved == null ? '' : String(resolved);
-}
-
-function joinDataDir(workspaceRoot: string): string {
-  const sep = workspaceRoot.includes('\\') && !workspaceRoot.includes('/') ? '\\' : '/';
-  return `${workspaceRoot.replace(/[\\/]+$/, '')}${sep}${FORESHADOW_DATA_DIR_NAME}`;
 }
 
 const ForeshadowConfig: React.FC = () => {
@@ -121,7 +116,10 @@ const ForeshadowConfig: React.FC = () => {
   ], [enabledModels, t]);
 
   const workspace = workspaceManager.getState().currentWorkspace;
-  const dataDir = workspace?.rootPath ? joinDataDir(workspace.rootPath) : null;
+  const dataDir = useMemo(
+    () => foreshadowRuntimeMap.getDataDir(workspace),
+    [workspace],
+  );
   const remoteOrPeer = Boolean(
     isPeerDeviceModeActive() || (workspace ? isRemoteWorkspace(workspace) : false),
   );
@@ -135,8 +133,6 @@ const ForeshadowConfig: React.FC = () => {
         return t('status.noWorkspace');
       case 'REMOTE_UNSUPPORTED':
         return t('status.remoteUnsupported');
-      case 'NOT_AUTHORIZED':
-        return t('status.notAuthorized');
       case 'NOT_READY':
         return t('status.notReady');
       default:
@@ -192,8 +188,6 @@ const ForeshadowConfig: React.FC = () => {
       </ConfigPageLayout>
     );
   }
-
-  const captureDisabled = !config.enabled;
 
   return (
     <ConfigPageLayout>
@@ -253,7 +247,22 @@ const ForeshadowConfig: React.FC = () => {
             label={t('fields.dataDir.label')}
             description={dataDir ?? t('fields.dataDir.noWorkspace')}
           >
-            <code>{FORESHADOW_DATA_DIR_NAME}</code>
+            <code style={{ fontSize: '0.8em', wordBreak: 'break-all' }}>
+              {dataDir ?? t('fields.dataDir.noWorkspace')}
+            </code>
+            {dataDir && (
+              <IconButton
+                type="button"
+                variant="ghost"
+                size="small"
+                onClick={() => void workspaceAPI.revealInExplorer(dataDir)}
+                tooltip={t('actions.openDataDir')}
+                tooltipPlacement="top"
+                aria-label={t('actions.openDataDir')}
+              >
+                <FolderOpen />
+              </IconButton>
+            )}
           </ConfigPageRow>
 
           <ConfigPageRow
@@ -273,7 +282,7 @@ const ForeshadowConfig: React.FC = () => {
             <Switch
               checked={config.task_recognize}
               onChange={(event) => void updateConfig('task_recognize', event.target.checked)}
-              disabled={savingKey === 'task_recognize' || captureDisabled}
+              disabled={savingKey === 'task_recognize'}
               size="small"
             />
           </ConfigPageRow>
@@ -291,7 +300,7 @@ const ForeshadowConfig: React.FC = () => {
               }}
               options={modelOptions}
               size="small"
-              disabled={savingKey === 'task_model' || captureDisabled || !config.task_recognize}
+              disabled={savingKey === 'task_model' || !config.task_recognize}
             />
           </ConfigPageRow>
         </ConfigPageSection>
