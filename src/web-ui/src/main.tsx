@@ -10,6 +10,7 @@ import { PeerDirectoryPickerHost } from "./infrastructure/peer-device/PeerDirect
 import { I18nProvider } from "./infrastructure/i18n/providers/I18nProvider";
 import { mouseGlowService } from "./infrastructure/mouse-glow/core/MouseGlowService";
 import "./app/styles/index.scss";
+import { initCreditBridge } from "@/tools/credit/mount";
 
 // Font: Noto Sans SC is loaded via a <link> tag in index.html.
 // File path: public/fonts/fonts.css, served as /fonts/fonts.css.
@@ -213,6 +214,8 @@ document.addEventListener(
 async function initializeBeforeRender(): Promise<void> {
   const phaseStartedAt = nowMs();
   startupTrace.markPhase('before_render_start');
+  // CREDIT 采集桥挂载（白名单改动 2）：fire-and-forget，桥内部异常自捕获不阻塞启动
+  void initCreditBridge().catch(() => {});
   await traceStartupStep('before_render_step', 'init_logger', async () => {
     await measureAsyncAndLog(log, 'Startup step completed', () => initLogger(), {
       data: { step: 'initLogger' },

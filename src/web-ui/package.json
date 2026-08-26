@@ -29,6 +29,8 @@
     "@tauri-apps/plugin-log": "^2.8.0",
     "@tauri-apps/plugin-notification": "^2.3.3",
     "@tauri-apps/plugin-opener": "^2.5.2",
+    "@credit/core": "file:../../../credit/packages/core",
+    "@credit/protocol": "file:../../../credit/packages/protocol",
     "@tiptap/core": "^3.20.4",
     "@tiptap/extension-details": "^3.20.4",
     "@tiptap/extension-link": "^3.20.4",
