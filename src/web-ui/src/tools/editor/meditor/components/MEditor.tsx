@@ -12,6 +12,7 @@ import './MEditor.scss'
 
 void createLogger('MEditor')
 let markdownTextareaTargetCounter = 0
+let markdownPreviewTargetCounter = 0
 
 export type MEditorProps = EditorOptions;
 
@@ -63,6 +64,7 @@ export const MEditor = forwardRef<EditorInstance, MEditorProps>((props, ref) => 
   const placeholder = placeholderProp ?? t('editor.meditor.placeholder')
   const containerRef = useRef<HTMLDivElement>(null)
   const textareaTargetIdRef = useRef(`markdown-textarea-${++markdownTextareaTargetCounter}`)
+  const previewTargetIdRef = useRef(`markdown-preview-${++markdownPreviewTargetCounter}`)
   const initialEditorValue = controlledValue ?? defaultValue
   const savedValueRef = useRef(initialEditorValue)
   const currentValueRef = useRef(initialEditorValue)
@@ -96,6 +98,10 @@ export const MEditor = forwardRef<EditorInstance, MEditorProps>((props, ref) => 
     return activeEditTargetService.bindTarget({
       id: targetId,
       kind: 'markdown-textarea',
+      // CREDIT（B-012）：暴露 textarea 元素与文件路径，供采集桥挂载 md 源码模式的
+      // 打开 / 编辑 / 光标 / 滚动行为。仅新增字段，不改变既有行为。
+      textarea: textareaRef.current,
+      editorFilePath: filePath,
       focus: () => {
         textareaRef.current?.focus()
       },
@@ -115,7 +121,34 @@ export const MEditor = forwardRef<EditorInstance, MEditorProps>((props, ref) => 
         return !!root && !!element && root.contains(element)
       }
     })
-  }, [effectiveMode, textareaRef])
+  }, [effectiveMode, textareaRef, filePath])
+
+  // CREDIT（B-012）：预览模式既无 textarea 也无 ProseMirror（纯渲染），但它是 md 的
+  // **默认模式** —— 不注册滚动容器，"打开就看"的阅读行为会全部丢失。
+  // 仅新增注册，不改变既有行为。
+  useEffect(() => {
+    if (effectiveMode !== 'preview') return
+
+    const targetId = previewTargetIdRef.current
+
+    return activeEditTargetService.bindTarget({
+      id: targetId,
+      kind: 'markdown-preview',
+      previewElement:
+        containerRef.current?.querySelector('.m-editor-preview') ?? containerRef.current,
+      editorFilePath: filePath,
+      previewLineCount: value.split('\n').length,
+      focus: () => {},
+      hasTextFocus: () => false,
+      undo: () => false,
+      redo: () => false,
+      containsElement: (element) => {
+        const root = containerRef.current
+        return !!root && !!element && root.contains(element)
+      }
+    })
+    // value 变化时重注册以刷新总行数（预览态不可编辑，实际极少触发）
+  }, [effectiveMode, filePath, value])
 
   useEffect(() => {
     if (controlledValue !== undefined && controlledValue !== value) {

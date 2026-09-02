@@ -6,7 +6,7 @@ const log = createLogger('ActiveEditTargetService');
 
 export type MacosEditMenuMode = 'system' | 'renderer';
 export type EditMenuAction = 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'selectAll';
-export type EditTargetKind = 'monaco' | 'markdown-ir' | 'markdown-textarea';
+export type EditTargetKind = 'monaco' | 'markdown-ir' | 'markdown-textarea' | 'markdown-preview';
 
 export interface EditTarget {
   id: string;
@@ -22,6 +22,41 @@ export interface EditTarget {
   /** Monaco: open the in-editor find widget (Ctrl/Cmd+F). */
   findInEditor?: () => boolean;
   containsElement?: (element: Element | null) => boolean;
+  /**
+   * CREDIT（P1）：绑定的 Monaco editor 实例引用。
+   * Bitfun 存在多个 monaco 副本，`monacoApi.editor.getEditors()` 恒为空、
+   * `getActiveEditor()` 只返回内部集合第一个元素，导致外部无法枚举全部 tab 的 editor。
+   * 此处在注册 EditTarget 时保留实例引用，供 CREDIT 采集桥全量挂载 scroll/selection。
+   * 仅新增可选字段，不改变既有行为。
+   */
+  editor?: monaco.editor.IStandaloneCodeEditor;
+  /**
+   * CREDIT（B-012）：非 Monaco 编辑器实例（TipTap/MEditor）。
+   * `getEditorType()` 把 `.md` 路由到 `markdown-editor`（TipTap 渲染），而采集桥
+   * 事件源全部绑在 Monaco 上，导致 TipTap 打开的文件完全不可见 —— 无 fileOpened /
+   * 无 scroll / 无 edit，SPEC 审阅行为整体丢失。此处仅新增可选字段，不改变既有行为。
+   */
+  tiptapEditor?: unknown;
+  /**
+   * CREDIT（B-012）：markdown **源码模式**的 textarea 元素（MEditor 的 textarea/split/source 模式）。
+   * 实测 md 文件默认就是以 textarea 承载（`kind: 'markdown-textarea'`），
+   * 页面里并不存在 ProseMirror —— 不暴露它，md 的阅读与编辑行为无从采集。
+   */
+  textarea?: unknown;
+  /**
+   * CREDIT（B-012）：**预览模式**的滚动容器元素（`.m-editor-preview`）。
+   * 预览态是纯渲染（MarkdownRenderer），既无 textarea 也无 ProseMirror；而预览正是
+   * md 的**默认模式** —— 不暴露容器，"打开就看"的阅读行为将全部丢失。
+   */
+  previewElement?: unknown;
+  /**
+   * CREDIT（B-012）：预览内容的**源码总行数**。
+   * 预览是渲染后的 HTML，与源码行不是 1:1，只能按"滚动比例 × 总行数"估算阅读位置；
+   * 没有总行数就无法换算成源码行区间。
+   */
+  previewLineCount?: number;
+  /** CREDIT（B-012）：编辑器绑定的文件路径（用于标注事件 uri） */
+  editorFilePath?: string;
 }
 
 const MENU_EVENT_ACTIONS: Array<{ eventName: string; action: EditMenuAction }> = [
@@ -200,6 +235,8 @@ export function createMonacoEditTarget(editor: monaco.editor.IStandaloneCodeEdit
   return {
     id,
     kind: 'monaco',
+    // CREDIT（P1）：保留实例引用，供采集桥枚举所有 tab 的 editor
+    editor,
     focus: () => {
       editor.focus();
     },

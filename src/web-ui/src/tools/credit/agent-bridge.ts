@@ -8,7 +8,7 @@
  */
 import type { CreditRawEvent } from "@credit/protocol";
 import type { BridgeSink } from "@credit/core";
-import { setAgentEditing, markAgentEditingFile } from "./agent-edit-state";
+import { setAgentEditing } from "./agent-edit-state";
 
 export interface AgentDeps {
   agentAPI: {
@@ -73,12 +73,10 @@ export function createAgentBridge(deps: AgentDeps): { dispose(): void } {
       const tool = e?.toolEvent ?? e ?? {};
       const toolName = tool?.toolName ?? tool?.name ?? tool?.tool_name ?? tool?.tool;
       if (!toolName) return; // 跳过空 toolCall（聚合态）
-      // agent 用 Edit 工具改文件：登记目标文件 uri（文件级精确标记，供 textChanged 标 actor=agent）
+      // agent 用 Edit 工具改文件期间，标记全局状态供 textChanged 标 source="agent"
       if (toolName === "Edit" || toolName === "EditTool") {
         const isComplete = tool?.result != null || tool?.result_for_assistant != null || tool?.event_type === "complete";
         setAgentEditing(!isComplete);
-        const targetUri = extractEditTargetUri(tool);
-        if (targetUri) markAgentEditingFile(targetUri);
       }
       const toolId = String(tool?.tool_id ?? e?.toolId ?? toolName + ":" + (e?.turnId ?? ""));
       const isComplete = tool?.result != null || tool?.result_for_assistant != null || tool?.event_type === "complete" || tool?.event_type === "tool_complete";
@@ -160,29 +158,4 @@ export function createAgentBridge(deps: AgentDeps): { dispose(): void } {
       });
     },
   };
-}
-
-/**
- * 从 agent tool 事件对象里尝试提取被编辑文件的可校验绝对路径/uri。
- * BitFun Edit 工具参数字段（见 ToolEventModule）：file_path / filePath / filepath /
- * target_file / targetFile / path / filename。同时兼容 result/result_for_assistant 回显。
- */
-function extractEditTargetUri(tool: any): string | null {
-  const candidates: any[] = [tool?.params, tool?.result, tool?.result_for_assistant, tool];
-  for (const c of candidates) {
-    if (!c || typeof c !== "object") continue;
-    const v =
-      c.file_path ??
-      c.filePath ??
-      c.filepath ??
-      c.target_file ??
-      c.targetFile ??
-      c.path ??
-      c.filename ??
-      c.target ??
-      c.file ??
-      c.abs_path;
-    if (typeof v === "string" && (v.includes("/") || v.includes("\\"))) return v;
-  }
-  return null;
 }

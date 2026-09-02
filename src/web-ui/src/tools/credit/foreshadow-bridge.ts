@@ -1,4 +1,4 @@
-/**
+﻿/**
  * foreshadow-bridge：订阅 globalEventBus / api 的编辑器相关事件，归一化为
  * CreditRawEvent（textChanged / selectionChanged / activeEditorChanged / terminalCommand / textScrolled）。
  * 全部为附加 listener；异常自捕获 + log + 计数，绝不向事件源抛错（§5 纪律）。
@@ -8,7 +8,7 @@
  */
 import type { CreditRawEvent } from "@credit/protocol";
 import type { BridgeSink } from "@credit/core";
-import { isAgentEditing, isAgentEditingFile } from "./agent-edit-state";
+import { isAgentEditing } from "./agent-edit-state";
 
 export interface ForeshadowDeps {
   /** globalEventBus 实例（Bitfun 内部） */
@@ -26,6 +26,11 @@ export interface ForeshadowDeps {
   logError: (msg: string, meta?: unknown) => void;
   /** 是否尝试挂 Monaco 滚动/光标补发（需调用方提供 monaco 实例获取器） */
   getMonacoInstance?: () => { onDidScrollChange?: (h: (e: any) => void) => void; onDidChangeCursorSelection?: (h: (e: any) => void) => void } | null;
+  /** 获取全部 Monaco editor 实例（Bitfun 每 tab 一个；用于全量挂载 scroll/selection） */
+  getMonacoEditors?: () => any[];
+  /** 订阅 Monaco editor 实例创建（monaco.editor.onDidCreateEditor）。
+   *  切 tab / 新开文件会创建新 editor 实例；靠轮询挂载有延迟，事件驱动可即时补挂。 */
+  onEditorCreated?: (cb: (ed: any) => void) => (() => void) | undefined;
   /** 订阅 Monaco model 内容变更（Source: MonacoModelManager.onModelContentChanged）。
    *  Bitfun 的 CodeEditor 仅用 getValue() 更新 dirty、不外发 editor:file:changed，
    *  故 textChanged 必须旁路挂 model listener（SPEC §5.2 / 风险 R1）。 */
@@ -124,7 +129,7 @@ export function createForeshadowBridge(deps: ForeshadowDeps): DisposableBridge {
         if (!uri) return;
         if (markOpened(uri)) publishOpened(uri);
         try {
-          tryAttachScroll();
+          tryAttachScroll(true);
         } catch {
           /* Monaco 可能仍未就绪；后续 contentReady 再试 */
         }
@@ -143,7 +148,7 @@ export function createForeshadowBridge(deps: ForeshadowDeps): DisposableBridge {
         }
         if (markOpened(uri)) publishOpened(uri);
         try {
-          tryAttachScroll();
+          tryAttachScroll(true);
         } catch {
           /* noop */
         }
@@ -180,7 +185,7 @@ export function createForeshadowBridge(deps: ForeshadowDeps): DisposableBridge {
                 changes: hunks, // 行级 insert/delete + 上下文 padding
                 beforeText: before || null,
                 afterText: after || null,
-                source: isAgentEditingFile(key) || isAgentEditing() ? "agent" : "user",
+                source: isAgentEditing() ? "agent" : "user",
                 ts: Date.now(),
                 fidelity: "frontend",
               });
@@ -306,31 +311,18 @@ export function createForeshadowBridge(deps: ForeshadowDeps): DisposableBridge {
   );
 
   // textScrolled / selectionChanged —— 若调用方提供 Monaco 实例获取器，挂附加 listener 补发。
-  // editor 实例在文件打开后才可用，故初始化尝试一次，并在文件打开事件时重试。
-  // 关键：CodeEditor 异步挂载 editor，modelCreated/contentReady 时 getMonacoInstance 可能仍为 null；
-  // 故 attach 失败时安排短延时重试（最多 N 次），确保 editor 就绪后必挂上（含 tab 切换后的新实例）。
-  let attachedEditor: any = null;
-  let attachRetryTimer: ReturnType<typeof setTimeout> | null = null;
-  let attachRetries = 0;
-  const tryAttachScroll = (retrying = false) => {
-    const ed = deps.getMonacoInstance?.();
-    // editor 实例随 tab 关闭/重开销毁重建：引用变化时重新挂（旧实例 listener 随实例销毁）
-    if (!ed?.onDidScrollChange) {
-      // editor 尚未就绪：安排有限次重试
-      if (retrying || attachRetries < 6) {
-        attachRetries++;
-        if (attachRetryTimer) clearTimeout(attachRetryTimer);
-        attachRetryTimer = setTimeout(() => tryAttachScroll(true), 400);
-      }
-      return;
-    }
-    if (ed === attachedEditor) return; // 已挂同一实例，跳过
-    attachedEditor = ed;
-    if (attachRetryTimer) {
-      clearTimeout(attachRetryTimer);
-      attachRetryTimer = null;
-    }
-    attachRetries = 0;
+  // editor 实例在文件打开后才可用，故初始化尝试一次，并在 editor:file:opened 时重新尝试挂。
+  /**
+   * 已挂载监听的 editor 实例集合。
+   * Bitfun 每个 tab 是**独立 editor 实例**，只挂 `getEditors()[0]` 会导致
+   * "只有第一个文件的 scroll 被采集"。故改为遍历全部实例逐个挂载（幂等）。
+   */
+  const attachedEditors = new Set<any>();
+
+  /** 对单个 editor 实例挂 scroll/selection（已挂过则跳过） */
+  const attachToEditor = (ed: any) => {
+    if (!ed?.onDidScrollChange || attachedEditors.has(ed)) return;
+    attachedEditors.add(ed);
     console.log("[credit] tryAttachScroll editor attached");
     // 事件参数（IScrollEvent/ISelectionChangedEvent）不含 uri/行号；
     // uri 每次从 editor 实例动态取（tab 切换后仍正确），视口用 getVisibleRanges()。
@@ -353,7 +345,7 @@ export function createForeshadowBridge(deps: ForeshadowDeps): DisposableBridge {
               const ranges = ed.getVisibleRanges?.() ?? [];
               const first = ranges[0]?.startLineNumber ?? 0;
               const last = ranges[ranges.length - 1]?.endLineNumber ?? 0;
-              if (!first && !last) return;
+              if (!first && !last) return; // 视口为空（未布局/隐藏 tab）不产出
               deps.publish({
                 type: "textScrolled",
                 uri: uriOf(),
@@ -372,6 +364,7 @@ export function createForeshadowBridge(deps: ForeshadowDeps): DisposableBridge {
       });
     }
     if (ed.onDidChangeCursorSelection) {
+      // 每个 editor 实例独立挂 cursor/selection（uri 从该实例的 model 动态取）
       unsubs.push(
         wrapMonaco(ed.onDidChangeCursorSelection, (e: any) => {
           guard(() => {
@@ -394,6 +387,18 @@ export function createForeshadowBridge(deps: ForeshadowDeps): DisposableBridge {
       );
     }
   };
+
+  /** 遍历全部 editor 实例挂载（宿主提供 getMonacoEditors 时用之，否则回退单实例获取器） */
+  const tryAttachScroll = (verbose = false) => {
+    const list = deps.getMonacoEditors?.() ?? [];
+    const single = deps.getMonacoInstance?.();
+    const all: any[] = list.length > 0 ? list : single ? [single] : [];
+    if (verbose && all.length === 0) {
+      console.warn("[credit] scroll not attached", { hasEditor: false, hasScrollApi: false });
+    }
+    for (const ed of all) attachToEditor(ed);
+  };
+
   try {
     tryAttachScroll();
   } catch (e) {
@@ -403,17 +408,37 @@ export function createForeshadowBridge(deps: ForeshadowDeps): DisposableBridge {
     deps.globalEventBus.on("editor:file:opened", () => {
       // 打开文件时 active editor 已就绪，尝试补挂 scroll/selection
       try {
-        tryAttachScroll();
+        tryAttachScroll(true);
       } catch (e) {
         console.error("[credit] tryAttachScroll re-attach failed", { error: String(e) });
       }
     }),
   );
 
+  // 新 editor 实例创建 → 立即补挂（切 tab/新开文件场景，避免只采到第一个文件的 scroll）
+  const unsubCreate = deps.onEditorCreated?.(() => {
+    try {
+      tryAttachScroll(true);
+    } catch {
+      /* noop */
+    }
+  });
+  if (unsubCreate) unsubs.push(unsubCreate);
+
+  // 轮询挂载（P1）：Bitfun 打开文件**不发** editor:file:opened，且文件已建过 model 时
+  // 不再触发 modelCreated/contentReady —— 仅靠事件驱动会永远挂不上 scroll。
+  // 改为 1s 轮询探测；editor 实例随 tab 切换重建，tryAttachScroll 内部按引用变化重挂。
+  const attachTimer = setInterval(() => {
+    try {
+      tryAttachScroll(false);
+    } catch {
+      /* 轮询异常不冒泡（§5 旁路纪律） */
+    }
+  }, 300);
+  unsubs.push(() => clearInterval(attachTimer));
+
   return {
     dispose() {
-      if (attachRetryTimer) clearTimeout(attachRetryTimer);
-      attachedEditor = null;
       unsubs.forEach((u) => {
         try {
           u();

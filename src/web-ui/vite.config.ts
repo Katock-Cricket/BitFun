@@ -7,6 +7,53 @@ import { bitfunCanvasRuntimeBundlePlugin } from "./vite.config.canvas-runtime-pl
 const host = process.env.TAURI_DEV_HOST;
 
 /**
+ * CREDIT（P1 开发期辅助）：监听 @credit/* 的构建产物变化，自动失效模块图并刷新页面。
+ *
+ * 背景：`@credit/core` 是本地 file: 依赖，改完 core 需要 rebuild + 同步 dist。
+ * 但 Vite dev server 会把已加载的依赖模块缓存在进程内，不重启就读不到新代码，
+ * 导致"明明改了却还是旧行为"的反复排查。本插件让 dist 一变就自动重载。
+ */
+function creditCoreReloadPlugin() {
+  return {
+    name: "credit-core-reload",
+    configureServer(server: any) {
+      // @credit 模块强制不缓存：否则浏览器会一直复用带 ?v= 的旧 dist，
+      // 表现为"磁盘已是新版本，页面却还是旧行为"（重启 dev server 也无效）。
+      server.middlewares.use((req: any, res: any, next: any) => {
+        if (typeof req?.url === "string" && req.url.includes("@credit")) {
+          res.setHeader("Cache-Control", "no-store, must-revalidate");
+        }
+        next();
+      });
+      const glob = path
+        .resolve(__dirname, "../../node_modules/.pnpm/*/node_modules/@credit/*/dist/**/*.js")
+        .replace(/\\/g, "/");
+      try {
+        server.watcher.add(glob);
+      } catch {
+        /* watcher 不支持 glob 时忽略（不影响构建） */
+      }
+      const onChange = (file: string) => {
+        if (!file || !file.includes("@credit")) return;
+        try {
+          server.moduleGraph?.invalidateAll?.();
+        } catch {
+          /* noop */
+        }
+        const ws = server.hot ?? server.ws;
+        try {
+          ws?.send?.({ type: "full-reload" });
+        } catch {
+          /* noop */
+        }
+      };
+      server.watcher.on("change", onChange);
+      server.watcher.on("add", onChange);
+    },
+  };
+}
+
+/**
  * Native fs events do not work reliably on UNC network shares (\\server\...,
  * including \\wsl$ / \\wsl.localhost) or on WSL drvfs mounts (/mnt/<drive>).
  * Users upgrading from the polling-based watcher would silently lose HMR
@@ -37,6 +84,7 @@ export default defineConfig(({ mode, command }) => {
   return {
     plugins: [
       react(),
+      creditCoreReloadPlugin(),
       bitfunCanvasRuntimeBundlePlugin(),
       versionInjectionPlugin()
     ],
@@ -104,7 +152,12 @@ export default defineConfig(({ mode, command }) => {
   // Optimize dependency pre-building
   optimizeDeps: {
     // Exclude dependencies that need to be dynamically loaded
-    exclude: [],
+    //
+    // CREDIT（P1）：@credit/* 是本地 file: 依赖（workspace 内源码的构建产物）。
+    // 若走预构建，其 deps 缓存不会随 dist 内容变化而失效，导致 Bitfun 加载到**旧版** core
+    // ——表现为 P1 新增方法缺失（recover/syncSession is not a function）、数据写入旧格式 prId。
+    // 故排除预构建，dev 期始终从磁盘加载，改完 core 重启即可生效。
+    exclude: ["@credit/core", "@credit/protocol"],
     // Force pre-building dependencies
     // Resolve Vite 7 and React 18 compatibility issues
     include: [

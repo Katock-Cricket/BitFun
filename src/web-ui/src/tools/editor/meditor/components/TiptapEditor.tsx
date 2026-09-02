@@ -799,6 +799,11 @@ export const TiptapEditor = React.forwardRef<TiptapEditorHandle, TiptapEditorPro
     return activeEditTargetService.bindTarget({
       id: targetIdRef.current,
       kind: 'markdown-ir',
+      // CREDIT（B-012）：暴露 TipTap 实例与文件路径，供采集桥挂载 md 文件的
+      // fileOpened / edit / selection / scroll（此前 md 文件行为全部丢失）。
+      // 仅新增字段，不改变既有行为。
+      tiptapEditor: editor,
+      editorFilePath: filePath,
       focus: () => {
         focusEditorWithoutScroll(editor);
       },
@@ -826,7 +831,7 @@ export const TiptapEditor = React.forwardRef<TiptapEditorHandle, TiptapEditorPro
         return !!root && !!element && root.contains(element);
       },
     });
-  }, [editor, readonly]);
+  }, [editor, readonly, filePath]);
 
   useEffect(() => {
     return () => {
