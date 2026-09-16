@@ -19,6 +19,9 @@ import { useI18n } from '@/infrastructure/i18n';
 import type { MiniAppRunScope } from '../customization/miniAppCustomizationTypes';
 import { systemAPI } from '@/infrastructure/api/service-api/SystemAPI';
 import { workspaceAPI } from '@/infrastructure/api';
+// CREDIT 控制域（架构 §2.3 改动 ③）：常驻主进程的采集桥不经过 Worker，
+// 需在同进程内直连注册表（详见 tools/credit/control-registry.ts）。
+import { invokeCreditControl, isCreditControlMethod } from '@/tools/credit/control-registry';
 import {
   useMiniAppStore,
   MINIAPP_COMPOSER_MESSAGE_EVENT,
@@ -153,6 +156,20 @@ export function useMiniAppBridge(
         if (method === 'worker.call') {
           const innerMethod = (params.method as string) ?? '';
           const innerParams = (params.params as Record<string, unknown>) ?? {};
+
+          // CREDIT 控制域转交采集桥（架构 §2.3 改动 ③）。
+          // 采集桥常驻 WebUI 主进程、按会话状态启停记录；它**不是 Worker 方法**，
+          // 若不在此拦截，会被下面的 workerCall 分支当作未知方法拒绝。
+          if (isCreditControlMethod(innerMethod)) {
+            try {
+              const result = await invokeCreditControl(innerMethod, innerParams);
+              reply(result);
+            } catch (error) {
+              replyError(error instanceof Error ? error.message : String(error));
+            }
+            return;
+          }
+
           const ns = innerMethod.split('.')[0];
           const isHostPrimitive = ns === 'fs' || ns === 'shell' || ns === 'os' || ns === 'net';
           const isStorage = ns === 'storage';

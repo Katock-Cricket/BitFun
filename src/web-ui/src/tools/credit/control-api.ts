@@ -65,11 +65,23 @@ export function createControlApi(deps: ControlDeps): void {
         };
         return resp;
       } catch (e) {
-        deps.logError(`control-api ${method} failed`, { error: String(e) });
+        /**
+         * **错误上报必须自防护**：曾出现"真正的原因被日志层自己的异常顶掉"——
+         * handler 抛出 A，`deps.logError` 内部再抛 `ReferenceError: process is not defined`（B），
+         * 调用方只看到 B，A 永久丢失（P4 冒烟：`credit.reset` 的真实错误被掩盖）。
+         * 故：logError 自身异常只计数不逸出；返回给 UI 的错误附带**栈首行**便于定位。
+         */
+        const detail = String(e);
+        const stackTop = (e as { stack?: string })?.stack?.split("\n").slice(0, 3).join(" | ");
+        try {
+          deps.logError(`control-api ${method} failed`, { error: detail, stack: stackTop });
+        } catch {
+          /* 日志层异常绝不覆盖原始错误 */
+        }
         const resp: ControlResponse = {
           ok: false,
           reqId: params?.reqId ?? String(Date.now()),
-          error: String(e),
+          error: stackTop ? `${detail} ⧉ ${stackTop}` : detail,
         };
         return resp;
       }

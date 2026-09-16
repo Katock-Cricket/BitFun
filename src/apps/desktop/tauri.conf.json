@@ -3,7 +3,7 @@
   "productName": "BitFun",
   "identifier": "com.bitfun.desktop",
   "build": {
-    "beforeDevCommand": "pnpm run dev:web",
+    "beforeDevCommand": "pnpm -w run dev:web",
     "devUrl": "http://localhost:1422",
     "beforeBuildCommand": "pnpm run frontend:build-all",
     "frontendDist": "../../../dist"
@@ -20,6 +20,7 @@
     "resources": {
       "../../mobile-web/dist": "mobile-web/dist",
       "resources/worker_host.js": "resources/worker_host.js",
+      "resources/package.json": "resources/package.json",
       "../../../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md",
       "../../crates/services/services-integrations/assets/models-dev.LICENSE.txt": "third-party/models.dev/LICENSE.txt",
       "../../crates/services/services-integrations/assets/models-dev.provenance.json": "third-party/models.dev/provenance.json"

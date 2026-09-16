@@ -1,0 +1,6 @@
+{
+  "name": "bitfun-desktop-resources",
+  "private": true,
+  "type": "commonjs",
+  "//": "本文件是**运行时必需**的：worker_host.js 是 CJS 脚本，但仓库根的 package.json 声明了 \"type\": \"module\"。Node 判定模块制式时取『离该文件最近的 package.json』——没有本文件时，worker_host.js 会被当作 ESM，`require is not defined` 使其**启动即崩溃**，宿主侧表现为 `TauriCommandError: Validation error: 管道正在被关闭 (os error 232)`。Bun 不存在时（本机实测）必然踩到，故不得删除。"
+}

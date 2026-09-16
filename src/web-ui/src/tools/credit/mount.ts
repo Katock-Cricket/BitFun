@@ -12,6 +12,7 @@ import { monacoApi } from "@/tools/editor/services/monacoRuntime";
 import * as fsPlugin from "@tauri-apps/plugin-fs";
 import { homeDir } from "@tauri-apps/api/path";
 import { wireCreditBridges, type WiredBridge } from "./index.js";
+import { registerCreditControlMethod } from "./control-registry";
 // 用 namespace 导入并**容错读取**构建标识：若运行时加载的是不含该导出的旧 dist，
 // 具名导入会直接抛 SyntaxError 导致整个应用无法启动（诊断代码不该有这种破坏力）。
 import * as creditCore from "@credit/core";
@@ -330,7 +331,11 @@ export async function initCreditBridge(opts: InitOptions = {}): Promise<WiredBri
         cb({ uri: e.uri, filePath: e.filePath, content: e.content }),
       ),
     registerMethod: (method, handler) => {
-      // credit.* 方法域路由：经 globalEventBus 命名空间（worker app.call → bridge → emit）
+      // credit.* 方法域路由（架构 §2.3 改动 ③）：
+      // ① 注册进同进程模块注册表 —— MiniApp 桥（useMiniAppBridge）据此直连本桥
+      //    （globalEventBus.emit() 不返回 handler 结果，无法承载请求/响应）；
+      // ② 保留 globalEventBus 命名空间注册，兼容既有内部订阅方。
+      registerCreditControlMethod(method, handler);
       globalEventBus.on(method, (params: any) => handler(params));
     },
     core: {
